@@ -1,5 +1,3 @@
-import sys
-import yaml
 from src.utils.run_utils import *
 from src.GopStages import *
 from src.Config import GopConfig
