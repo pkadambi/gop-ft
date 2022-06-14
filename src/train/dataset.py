@@ -1,9 +1,7 @@
 import os
-import glob
 from typing import Tuple, Union
 from pathlib import Path
 
-import torchaudio
 import torch
 from torch import Tensor
 from torch.utils.data import Dataset
@@ -19,10 +17,6 @@ from src.utils.FeatureManager import FeatureManager
 
 
 from IPython import embed
-
-
-import pickle5
-
 import numpy as np
 
 
@@ -60,7 +54,7 @@ class EpaDB(Dataset):
         # Get string representation of 'path' in case Path object is passed
         sample_list_path = os.fspath(sample_list_path)
         phones_list_path = os.fspath(phones_list_path)
-        labels_path      = os.fspath(labels_path)
+        labels_path = os.fspath(labels_path)
 
         self._labels_path = labels_path
 
@@ -93,28 +87,32 @@ class EpaDB(Dataset):
         speaker_id = file_id.split("_")[0]
         utterance_id = file_id.split("_")[1]
 
+#       features, transcript = self._feature_manager.get_features_for_logid(file_id)
         features = self._feature_manager.get_features_for_logid(file_id)
 
 
         annotation_path = os.path.join(labels_path, speaker_id, "labels", file_id)
-        annotation = []
+        transcriptions = []
         phone_count = self.phone_count()
         pos_labels = np.zeros([features.shape[0], phone_count]) -1
         neg_labels = np.zeros([features.shape[0], phone_count]) -1
         labels     = np.zeros([features.shape[0], phone_count])
+        ids        = np.zeros([features.shape[0], phone_count])
         phone_times = []
+        transition_indexes =  []
+        durations = []
 
         with open(annotation_path + ".txt") as f:
             for line in f.readlines():
                 line = line.split()
                 target_phone = line[1]
-                pronounced_phone = line[2]
                 label = line[3]
                 start_time = int(line[4])  
                 end_time = int(line[5])
                 try:
                     #These two if statements fix the mismatch between #frames in annotations and feature matrix
                     if end_time > features.shape[0]:
+                        #Printear warning aca
                         if  end_time > features.shape[0] + 2:
                             raise Exception('End time in annotations longer than feature length by ' + str(features.shape[0] - end_time))
                         end_time = features.shape[0]
@@ -124,6 +122,8 @@ class EpaDB(Dataset):
                         start_time = end_time
 
                     phone_times.append((target_phone, start_time, end_time))
+                    transition_indexes.append(end_time-1)
+                    durations.append(end_time-start_time)
 
                     #If the target phone is not defined, collapse it into similar Kaldi phone (i.e Th -> T)
                     if target_phone not in self._phone_sym2int_dict.keys():
@@ -132,6 +132,7 @@ class EpaDB(Dataset):
                     #Get network output node index for the target phone
                     target_phone_int = self._phone_sym2int_dict[target_phone]
                     target_node      = self.phone_int2node_dict[target_phone_int]
+                    transcriptions.append(target_phone_int)
 
                     #If the phone was mispronounced, put a -1 in the labels
                     #If the phone was pronounced correcly, put a 1 in the labels
@@ -139,10 +140,12 @@ class EpaDB(Dataset):
                     if start_time != end_time and label == '+':
                         pos_labels[start_time:end_time, target_node] = 1
                         labels[start_time:end_time, target_node] = 1                        
-                    
+                        ids[start_time:end_time, target_node] = 1
+
                     if start_time != end_time and label == '-':
                         neg_labels[start_time:end_time, target_node] = 0
                         labels[start_time:end_time, target_node] = -1
+                        ids[start_time:end_time, target_node] = 1
 
                 except ValueError as e:
                     print("Bad item:")
@@ -151,7 +154,6 @@ class EpaDB(Dataset):
                     print("#Frames in features: ")
                     print(features.shape[0])
                     print(line)
-                    embed()
                     print(e)
                 except KeyError as e:
                     print("Bad item:")
@@ -160,17 +162,19 @@ class EpaDB(Dataset):
                     print("#Frames in features: ")
                     print(features.shape[0])
                     print(line)
-                    embed()
                     print(e)
-
+        
         output_dict = {'features'    : features,
-                       #'transcript'  : transcript,
                        'speaker_id'  : speaker_id,
                        'utterance_id': utterance_id,
                        'pos_labels'  : torch.from_numpy(pos_labels),
                        'neg_labels'  : torch.from_numpy(neg_labels), 
                        'labels'      : torch.from_numpy(labels), 
-                       'phone_times' : phone_times
+                       'phone_times' : phone_times,
+                       'transition_indexes': torch.from_numpy(np.asarray(transition_indexes)), 
+                       'ids'          : torch.from_numpy(ids),
+                       'transcription': torch.from_numpy(np.asarray(transcriptions)),
+                       'durations' : torch.from_numpy(np.asarray(durations))
                       }
 
         return output_dict
