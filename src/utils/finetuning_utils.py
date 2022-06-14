@@ -1,14 +1,9 @@
-import os
-import glob
 from pathlib import Path
-
-import torchaudio
 import torch
 import torch.optim as optim
-
 import wandb
-
 from IPython import embed
+import numpy as np
 
 
 def unpack_logids_from_batch(batch):
@@ -26,8 +21,38 @@ def unpack_labels_from_batch(batch):
 def unpack_neg_labels_from_batch(batch):
     return torch.stack([item['neg_labels'] for item in batch])
 
+def unpack_ids_from_batch(batch):
+    return torch.stack([item['ids'] for item in batch])
+
 def unpack_phone_times_from_batch(batch):
     return [item['phone_times'] for item in batch]
+
+def unpack_transcriptions_from_batch(batch):
+    return  torch.stack([item['transcription'] for item in batch])
+
+def unpack_durations_from_batch(batch):
+    return  torch.stack([item['durations'] for item in batch])
+
+def re_pad_index(index):
+    last_i = 0
+    non_zero = True
+    for i in range(len(index)-1):
+        if index[i+1]==0 and non_zero == True:
+            last_i = index[i]
+            non_zero = False
+    index = np.where(index == 0, last_i, index)
+    return(index)
+
+def unpack_transitions_from_batch(batch):
+    
+    all_indexes = []
+    for i, item in enumerate(batch):
+        index = item['transition_indexes'].numpy()
+        index = re_pad_index(index)
+        batch_position = np.repeat(i,len(index))
+        trans_index = np.array([batch_position, index])
+        all_indexes.append(trans_index)
+    return np.stack([ind for ind in all_indexes], axis=1)
 
 def collate_fn_padd(batch):
     '''
@@ -42,11 +67,24 @@ def collate_fn_padd(batch):
     batch_neg_labels = torch.nn.utils.rnn.pad_sequence(batch_neg_labels, batch_first=True, padding_value=-1)
     batch_labels     = [item['labels'] for item in batch]
     batch_labels     = torch.nn.utils.rnn.pad_sequence(batch_labels, batch_first=True, padding_value=0)
+    batch_ids        = [item['ids'] for item in batch]
+    batch_ids        = torch.nn.utils.rnn.pad_sequence(batch_ids, batch_first=True, padding_value=0)
+    batch_indexes    = [item['transition_indexes'] for item in batch]
+    batch_indexes    = torch.nn.utils.rnn.pad_sequence(batch_indexes, batch_first=True, padding_value=0)
+    batch_transcripts = [item['transcription'] for item in batch]
+    batch_transcripts = torch.nn.utils.rnn.pad_sequence(batch_transcripts, batch_first=True, padding_value=0)
+    batch_durations = [item['durations'] for item in batch]
+    batch_durations = torch.nn.utils.rnn.pad_sequence(batch_durations, batch_first=True, padding_value=0)
+    
     for i in range(len(batch)):
         batch[i]['features']   = batch_features[i]
         batch[i]['pos_labels'] = batch_pos_labels[i]
         batch[i]['neg_labels'] = batch_neg_labels[i]
         batch[i]['labels']     = batch_labels[i]
+        batch[i]['ids']        = batch_ids[i]
+        batch[i]['transition_indexes'] = batch_indexes[i]
+        batch[i]['transcription'] = batch_transcripts[i]
+        batch[i]['durations'] = batch_durations[i]
     return batch
 
 #phone_sym2int_dict:  Dictionary mapping phone symbol to integer given a phone list path
@@ -117,19 +155,6 @@ def get_phone_score_from_frame_scores(frame_level_scores, start_time, end_time, 
     else:
         raise Exception('Unsupported frame score collapse method ' + method)
 
-#Logs the phone number and phone level score between start_time and end_time.
-# method is used to collapse frame level scores to phone level(sum or mean)
-# end_time must be larger than start time
-def log_phone_number_and_score(log_fh, labels, scores, start_time, end_time, method):
-	    if end_time <= start_time :
-	        raise Exception('End time: ' + str(end_time) + ' is not greater than start time: ' + str(start_time))
-	    phone_number_start = get_phone_number_at_frame(labels, start_time)
-	    phone_number_end = get_phone_number_at_frame(labels, end_time-1)
-	    if phone_number_start != phone_number_end:
-	        raise Exception('Phones at start and end time in labels differ')
-	    phone_level_score = get_phone_score_from_frame_scores(scores, start_time, end_time, method)
-	    log_fh.write( '[ ' + str(phone_number_start) + ' ' + str(phone_level_score) + ' ] ')
-
 
 #This function takes a dataloader and writes the logids and paths of all samples
 #in the dataloader to directory/filename. The generated sample list is used to train/test 
@@ -163,11 +188,11 @@ def generate_fileid_list_and_spkr2logid_dict(sample_list_path):
 #This function takes the path to an utterance list and returns a list of speaker ids
 def get_speaker_list_from_utterance_list_file(sample_path):
     speaker_list = []
-    sample_list_fh = open(sample_list_path, "r")
+    sample_list_fh = open(sample_path, "r")
     for line in sample_list_fh.readlines():
         line = line.split()
         logid = line[0]
         speaker_id = logid.split('_')[0]
         if speaker_id not in speaker_list:
             speaker_list.append(speaker_id)
-    return speaker_listr
+    return speaker_list
