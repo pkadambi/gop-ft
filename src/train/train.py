@@ -187,14 +187,6 @@ def criterion_fast(batch_outputs, batch_labels, weights=None, norm_per_phone_and
     else:
         return total_loss
 
-def criterion_simple(batch_outputs, batch_labels):
-    '''
-    Calculates loss
-    '''
-    loss_fn = torch.nn.BCEWithLogitsLoss()
-    batch_outputs, batch_labels = get_outputs_and_labels_for_loss(batch_outputs, batch_labels)
-    loss = loss_fn(batch_outputs, batch_labels)
-    return loss
 
 def start_from_checkpoint(PATH, model, optimizer, scheduler):
     checkpoint = torch.load(PATH)
@@ -235,16 +227,29 @@ def choose_starting_epoch(epochs, state_dict_dir, run_name, fold, model, optimiz
 
     return model, optimizer, scheduler, step, start_from_epoch
 
-def foward_backward_pass(data, model, optimizer, phone_weights, phone_int2sym, phone_int2node, norm_per_phone_and_class):
+def foward_backward_pass(data, model, optimizer, phone_weights, phone_int2sym, phone_int2node,
+                         norm_per_phone_and_class, loss_per_phone, normalize): 
+    evaluation = False
     inputs       = unpack_features_from_batch(data).to(device)
     batch_labels = unpack_labels_from_batch(data).to(device)
+    batch_target_phones = unpack_ids_from_batch(data).to(device)
+    batch_indexes = unpack_transitions_from_batch(data) # numpy
+    phone_durations = unpack_durations_from_batch(data).to(device)
     
     # zero the parameter gradients
     optimizer.zero_grad()
 
-    outputs = model(inputs)
+    outputs = model(inputs, loss_per_phone, evaluation, batch_target_phones, batch_indexes, normalize)
     
-    loss = criterion_fast(outputs, batch_labels, weights=phone_weights, phone_int2sym=phone_int2sym, phone_int2node=phone_int2node, norm_per_phone_and_class=norm_per_phone_and_class, min_frame_count=0)
+    if loss_per_phone: 
+        collapsed_labels =torch.cat((
+                      torch.zeros(batch_labels.shape[0],1,batch_labels.shape[2]).to(device),
+                      torch.cumsum(batch_labels,1)[torch.tensor(batch_indexes[0,:]),torch.tensor(batch_indexes[1,:])]),  dim=1)
+        batch_labels_r  =  torch.sign(torch.diff(collapsed_labels,dim=1)).to(device)
+    else: 
+        batch_labels_r = batch_labels
+
+    loss = criterion_fast(outputs, batch_labels_r, weights=phone_weights, phone_int2sym=phone_int2sym, phone_int2node=phone_int2node, norm_per_phone_and_class=norm_per_phone_and_class, min_frame_count=0)
 
     loss.requires_grad_()
 
@@ -252,22 +257,25 @@ def foward_backward_pass(data, model, optimizer, phone_weights, phone_int2sym, p
 
     return loss
 
-def log_loss_if_first_batch(epoch, i, fold, loss, model, testloader, step):
+def log_loss_if_first_batch(epoch, i, fold, loss, model, testloader, step, loss_per_phone, normalize):
     if epoch == 0 and i == 0:
-        wandb.log({'train_loss_fold_' + str(fold): loss,
-                  'step' : step})
-        test_loss, test_loss_dict = test(model, testloader)
+        wandb.log({'train_loss_fold_' + str(fold): loss, 'step' : step})
+        test_loss, test_loss_dict = test(model, testloader, loss_per_phone, normalize)
         step = log_test_loss(fold, test_loss, step, test_loss_dict)
 
     return step
 
-def train_one_epoch(trainloader, testloader, model, optimizer, running_loss, fold, epoch, step, use_clipping, phone_weights, phone_int2sym, phone_int2node, norm_per_phone_and_class):
+
+def train_one_epoch(trainloader, testloader, model, optimizer, running_loss, fold, epoch, step, use_clipping, phone_weights, 
+                    phone_int2sym, phone_int2node, norm_per_phone_and_class, loss_per_phone, normalize):
+
 
     for i, data in enumerate(trainloader, 0):
 
-        loss = foward_backward_pass(data, model, optimizer, phone_weights, phone_int2sym, phone_int2node, norm_per_phone_and_class)
+        loss = foward_backward_pass(data, model, optimizer, phone_weights, phone_int2sym, phone_int2node, 
+                                    norm_per_phone_and_class,  loss_per_phone, normalize)
 
-        step = log_loss_if_first_batch(epoch, i, fold, loss, model, testloader, step)
+        step = log_loss_if_first_batch(epoch, i, fold, loss, model, testloader, step, loss_per_phone, normalize)
 
         if use_clipping:
             nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0, error_if_nonfinite=True, norm_type=2)
