@@ -234,7 +234,6 @@ def foward_backward_pass(data, model, optimizer, phone_weights, phone_int2sym, p
     batch_labels = unpack_labels_from_batch(data).to(device)
     batch_target_phones = unpack_ids_from_batch(data).to(device)
     batch_indexes = unpack_transitions_from_batch(data) # numpy
-    phone_durations = unpack_durations_from_batch(data).to(device)
     
     # zero the parameter gradients
     optimizer.zero_grad()

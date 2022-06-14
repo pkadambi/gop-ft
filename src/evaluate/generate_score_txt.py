@@ -1,21 +1,14 @@
-import os
-import glob
+# Nuevo
 from pathlib import Path
+from src.pytorch_models.FTDNNPronscorer import FTDNNPronscorer
 
-import torchaudio
 import torch
 import torch.optim as optim
 
 from src.utils.finetuning_utils import *
-#from utils import *
 from src.train.dataset import *
-
 from torch.optim.swa_utils import AveragedModel
-
-from src.pytorch_models.FTDNNPronscorer import *
-
 from IPython import embed
-
 import argparse
 
 def removeSymbols(str, symbols):
@@ -23,72 +16,49 @@ def removeSymbols(str, symbols):
         str = str.replace(symbol,'')
     return str
 
-def get_alignments(alignments_path):
-    alignments_dict = {}
-
-    for l in open(alignments_path, 'r').readlines():
-        l=l.split()
-        #Get phones alignments
-        if len(l) > 3 and l[1] == 'phones':
-            logid = l[0]
-            alignment = []
-            alignments_dict[logid] = {}
-            for i in range(2, len(l),3):
-                current_phone =     removeSymbols(l[i],  ['[',']',',',')','(','\''])
-                start_time    = int(removeSymbols(l[i+1],['[',']',',',')','(','\'']))
-                duration      = int(removeSymbols(l[i+2],['[',']',',',')','(','\'']))
-                end_time      = start_time + duration
-                alignment.append((current_phone, start_time, end_time))
-            alignments_dict[logid] = alignment
-    return alignments_dict
-
-
-def generate_scores_for_sample(phone_times, frame_level_scores):
-    scores = []
-    #Iterate over phone transcription and calculate score for each phome
-    for phone_name, start_time, end_time in phone_times:
-        #Do not score SIL phones
-        if phone_name == 'SIL':
-            continue
-
-        #Check if the phone was uttered
-        if start_time != end_time:
-            current_phone_score = get_phone_score_from_frame_scores(frame_level_scores, 
-                                                                    start_time, end_time, 'mean')
-        #Use fixed negative score for deletions
-        else:
-            current_phone_score = -1000
-        scores.append((phone_name, current_phone_score))
-    return scores
-
 def generate_scores_for_testset(model, testloader):
     print('Generating scores for testset')
+    
+    normalize = True
+    evaluation = True
+    loss_per_phone = False 
+  
     scores = {}
     for i, batch in enumerate(testloader, 0):       
         print('Batch ' + str(i+1) + '/' + str(len(testloader)))
+        
         logids      = unpack_logids_from_batch(batch)
         features    = unpack_features_from_batch(batch)
-        labels      = unpack_labels_from_batch(batch)
-        phone_times = unpack_phone_times_from_batch(batch)
-        outputs     = (-1) * model(features)
-
-        frame_level_scores = get_scores_for_canonic_phones(outputs, labels)
-        for i,logid in enumerate(logids):
-            current_sample_scores = generate_scores_for_sample(phone_times[i], frame_level_scores[i])
-            scores[logid] = current_sample_scores
+        batch_target_phones = unpack_ids_from_batch(batch)
+        batch_indexes = unpack_transitions_from_batch(batch)
+        batch_transcripts =  unpack_transcriptions_from_batch(batch)
+        batch_phone_durs = unpack_durations_from_batch(batch)
+    
+        outputs = (-1) * model(features, loss_per_phone, evaluation, batch_target_phones, batch_indexes, normalize, phone_durs=batch_phone_durs)
+        
+        for j, logid in enumerate(logids):
+          
+            p = batch_transcripts[j].detach().numpy()
+            o = outputs[j].detach().numpy()
+            scores[logid] = [o[p!=0], p[p!=0]]
+            #embed()
+        
     return scores
 
-def log_sample_scores_to_txt(logid, scores, score_log_fh, phone_dict):
+
+def log_sample_scores_to_txt(logid, sample_scores, score_log_fh):
     score_log_fh.write(logid + ' ')
-    for phone_name, score in scores:
-        phone_number = phone_dict[phone_name]
-        score_log_fh.write( '[ ' + str(phone_number) + ' ' + str(score)  + ' ] ')
+    scores = sample_scores[0]
+    phone_number = sample_scores[1]
+    
+    for i, score in enumerate(scores):
+        score_log_fh.write( '[ ' + str(phone_number[i]) + ' ' + str(score)  + ' ] ')
     score_log_fh.write('\n')
 
 def log_testset_scores_to_txt(scores, score_log_fh, phone_dict):
     print('Writing scores to .txt')
     for logid, sample_score in scores.items():
-        log_sample_scores_to_txt(logid, sample_score, score_log_fh, phone_dict)
+        log_sample_scores_to_txt(logid, sample_score, score_log_fh)
 
 def main(config_dict):
 
@@ -121,8 +91,10 @@ def main(config_dict):
     model.load_state_dict(state_dict['model_state_dict'])
 
     phone_dict = testset._phone_sym2int_dict
-
+    
+    # Con el modelo y los datos de test generamos el score
     scores = generate_scores_for_testset(model, testloader)
+    # Después los abre para loguearlos
     score_log_fh = open(gop_txt_dir+ '/' + gop_txt_name, 'w+')
     log_testset_scores_to_txt(scores, score_log_fh, phone_dict)
 

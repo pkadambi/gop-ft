@@ -1,7 +1,8 @@
 import argparse 
 from src.utils.run_utils import get_eval_stage
-from src.ExperimentStages import CreateExperimentDirectoryStage, CreateFinetuneModelStage, ComplexStage, TrainHeldoutStage, TrainCrossValStage, GenerateScoresCrossValStage, GenerateScoresHeldoutStage
+from src.ExperimentStages import CreateExperimentDirectoryStage, CreateFinetuneModelStage, TrainHeldoutStage, TrainCrossValStage, GenerateScoresCrossValStage, GenerateScoresHeldoutStage
 from src.Config import ExperimentConfig
+from src.Stages import ComplexStage
 from IPython import embed
 
 def get_prep_stage(config_dict):
