@@ -1,11 +1,10 @@
 import os
-
 import src.train.generate_kfold_utt_lists as generate_kfold_utt_lists
 import src.train.train as train
 import src.evaluate.generate_score_txt as generate_score_txt
 import src.evaluate.generate_data_for_eval as generate_data_for_eval
 import src.dataprep.convert_chain_to_pytorch_for_finetuning as convert_chain_to_pytorch_for_finetuning
-from src.Stages import *
+from src.Stages import AtomicStage
 
 
 def make_experiment_directory(experiment_dir_path, setup):
