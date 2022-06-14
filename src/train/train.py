@@ -283,9 +283,10 @@ def train_one_epoch(trainloader, testloader, model, optimizer, running_loss, fol
 def define_scheduler_from_config(scheduler_config, optimizer):
     return eval(scheduler_config)
 
-def train(model, trainloader, testloader, fold, epochs, swa_epochs, state_dict_dir, run_name, layer_amount, use_dropout, lr, 
-scheduler_config, swa_lr, use_clipping, batchnorm, norm_per_phone_and_class):
+def train(model, trainloader, testloader, fold, epochs, swa_epochs, state_dict_dir, run_name, layer_amount, 
+        use_dropout, lr, scheduler_config, swa_lr, use_clipping, batchnorm, norm_per_phone_and_class, loss_per_phone, normalize):
     global phone_weights, phone_count, device, checkpoint_step
+
 
     print("Started training fold " + str(fold))
 
@@ -307,10 +308,11 @@ scheduler_config, swa_lr, use_clipping, batchnorm, norm_per_phone_and_class):
 
         running_loss = 0.0
         
-        running_loss, step, model, optimizer = train_one_epoch(trainloader, testloader, model, optimizer, running_loss, fold, epoch,
-                                                        step, use_clipping, phone_weights, phone_int2sym, phone_int2node, norm_per_phone_and_class)
+        running_loss, step, model, optimizer = train_one_epoch(trainloader, testloader, model, optimizer, running_loss, 
+                                                                fold, epoch, step, use_clipping, phone_weights, phone_int2sym, 
+                                                                phone_int2node, norm_per_phone_and_class, loss_per_phone, normalize)
 
-        test_loss, test_loss_dict = test(model, testloader)
+        test_loss, test_loss_dict = test(model, testloader, loss_per_phone, normalize)
         step = log_test_loss(fold, test_loss, step, test_loss_dict)
 
         if scheduler is not None:
