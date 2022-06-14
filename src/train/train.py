@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 import yaml
 
-
 import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import *
@@ -11,13 +10,10 @@ import torch.multiprocessing as mp
 
 from src.utils.finetuning_utils import *
 from src.train.dataset import *
-
 from torch.utils.data import DataLoader, ConcatDataset
 
 from src.pytorch_models.FTDNNPronscorer import *
-
 import wandb
-
 from IPython import embed
 
 global phone_int2sym
@@ -87,7 +83,6 @@ def freeze_layers_for_finetuning(model, layer_amount, use_dropout, batchnorm):
             else: 
                 layers_list.insert(0,name)
     
-    #layers_list = list(np.sort(layers_list))
     layers_to_train = layers_list[-layer_amount:]
     #Freeze all layers except #layer_amount layers starting from the last
     for name, module in model.named_modules():
@@ -334,23 +329,35 @@ scheduler_config, swa_lr, use_clipping, batchnorm, norm_per_phone_and_class):
             save_state_dict(state_dict_dir, run_name, fold, epoch+1, step, model, optimizer, scheduler)
 
 
-def test(model, testloader):
+def test(model, testloader, loss_per_phone, normalize):
 
     global phone_weights, phone_count, phone_int2sym, phone_int2node, device
-
+    evaluation = False
     total_loss = 0
     for i, batch in enumerate(testloader, 0):
         features = unpack_features_from_batch(batch).to(device)
         labels   = unpack_labels_from_batch(batch).to(device)
-        outputs = model(features)
+        batch_target_phones = unpack_ids_from_batch(batch).to(device)
+        batch_indexes = unpack_transitions_from_batch(batch)
+        
+        outputs = model(features, loss_per_phone, evaluation, batch_target_phones, batch_indexes, normalize)
+
+        if loss_per_phone: 
+            collapsed_labels =torch.cat((
+                      torch.zeros(labels.shape[0],1,labels.shape[2]).to(device),
+                      torch.cumsum(labels,1)[torch.tensor(batch_indexes[0,:]),torch.tensor(batch_indexes[1,:])]),  dim=1)
+            labels_r  = torch.sign(torch.diff(collapsed_labels,dim=1)).to(device)
+        else: 
+            labels_r = labels
         loss_dict = {}
-        loss, loss_dict = criterion_fast(outputs, labels, weights=phone_weights, 
+        loss, loss_dict = criterion_fast(outputs, labels_r, weights=phone_weights, 
                                          log_per_phone_and_class_loss=True, phone_int2sym=phone_int2sym, phone_int2node=phone_int2node)
 
         loss = loss.item()
         total_loss += loss
 
     return total_loss / (i + 1), loss_dict
+
 
 def main(config_dict):
     global phone_int2sym, phone_int2node, phone_weights, phone_count, device, checkpoint_step
@@ -380,6 +387,9 @@ def main(config_dict):
     state_dict_dir           = config_dict["state-dict-dir"]
     device_name              = config_dict["device"]
     checkpoint_step          = config_dict["checkpoint-step"]
+    loss_per_phone           = config_dict["loss-per-phone"]
+    normalize                = config_dict["normalize"]
+
 
 
     wandb.init(project="gop-finetuning", entity="pronscoring-liaa")
@@ -417,4 +427,4 @@ def main(config_dict):
     wandb.watch(model, log_freq=100)
     train(model, trainloader, testloader, fold, epochs, swa_epochs, state_dict_dir, run_name, layer_amount, 
           use_dropout, learning_rate, scheduler_config, swa_lr, use_clipping, batchnorm, 
-          norm_per_phone_and_class)
+          norm_per_phone_and_class,  loss_per_phone, normalize)
