@@ -1,7 +1,8 @@
 import argparse
 from src.utils.run_utils import CreateExperimentDirectoryStage
-from src.GopStages import GopHeldoutStage, EvaluateGopStage, ComplexStage, GopStage
+from src.GopStages import GopHeldoutStage, EvaluateGopStage, GopStage
 from src.Config import GopConfig
+from src.Stages import ComplexStage
 from IPython import embed
 
 def run_all(config_yaml, from_stage, to_stage, use_heldout):
@@ -26,5 +27,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     use_heldout = args.heldout
+
+    args.from_stage = 'gop'
+    args.to_stage = 'evaluate'
+
+    args.config_yaml='./configs/gop_kaldi_labels.yaml'
 
     run_all(args.config_yaml, args.from_stage, args.to_stage, use_heldout)

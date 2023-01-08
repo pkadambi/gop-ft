@@ -2,7 +2,6 @@ import src.dataprep.align as align
 import src.dataprep.create_kaldi_labels as create_kaldi_labels
 import src.dataprep.prepare_data as prepare_data
 from src.Stages import AtomicStage
-
 class PrepareFeaturesAndModelsStage(AtomicStage):
     _name = "features"
 
