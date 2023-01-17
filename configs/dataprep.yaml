@@ -1,5 +1,5 @@
 ---
-  data-root-path:          "./EpaDB/"
+  data-root-path:          "./child_speech_16_khz_test/"
   output-dir:              "./data/"
   librispeech-models-path: "./librispeech_models/"
   pytorch-models-path:     "./pytorch_models/"

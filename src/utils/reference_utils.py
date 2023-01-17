@@ -1,6 +1,7 @@
 import numpy as np
 from IPython import embed
-
+import re
+import os
 # Function that reads transcriptions files and loads them to
 # a series of useful dictionaries
 
@@ -113,8 +114,9 @@ def find_best_ref(transcription, reference_list_zero, reference_list, spk):
 
 #Returns path to specific labels file for a given utterance
 def get_labels_file_path(labels_dir_path, utterance):
-    spk, _ = utterance.split("_")
-    return "%s/%s/%s/%s.txt"%(labels_dir_path, spk, "labels", utterance)
+    i = re.search('[a-z]', utterance).start()
+    spk = utterance[:i]
+    return os.path.join(labels_dir_path, spk, utterance + '.lab')
 
 #This function reads a single reference file and returns 
 #the reference column, the manual annotation and the labels column
@@ -148,8 +150,12 @@ def get_reference_from_system_alignments(reference_transcriptions_path, labels_d
 
     # Now, iterate over utterances
     for utterance in utterance_list:
-
-        spk, sent = utterance.split("_")
+        i = re.search('[a-z]', utterance).start()
+        spk = utterance[:i]
+        if spk[-1]=='_': # to deal with 0609_F_AK
+            spk = spk[:-1]
+        sent = utterance[i:]
+        # spk, sent = utterance.split("_")
 
         labels_file_path = get_labels_file_path(labels_dir_path, utterance)
         print("----------------------------------------------------------------------------------------")

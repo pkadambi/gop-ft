@@ -22,7 +22,7 @@ class ComplexStage():
         else:
             to_stage_index   = self._substage_names.index(to_stage) + 1
 
-        for stage in self._substages[from_stage_index : to_stage_index]:
+        for ii, stage in enumerate(self._substages[from_stage_index : to_stage_index]):
             stage.run()
  
 

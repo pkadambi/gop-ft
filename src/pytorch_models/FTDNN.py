@@ -19,10 +19,10 @@ class FTDNNLayer(nn.Module):
         self.device = device
 
 
-        self.sorth = nn.Linear(self.semi_orth_in_dim, self.semi_orth_out_dim, bias=False)
-        self.affine = nn.Linear(self.affine_in_dim, self.out_dim, bias=True) 
+        self.sorth = nn.Linear(self.semi_orth_in_dim, self.semi_orth_out_dim, bias=False, device=device)
+        self.affine = nn.Linear(self.affine_in_dim, self.out_dim, bias=True, device=device)
         self.nl = nn.ReLU()
-        self.bn = nn.BatchNorm1d(out_dim, affine=False, eps=0.001)
+        self.bn = nn.BatchNorm1d(out_dim, affine=False, eps=0.001, device=device)
         self.dropout = nn.Dropout(p=self.dropout_p)
 
     def forward(self, x):
@@ -54,19 +54,19 @@ class InputLayer(nn.Module):
         self,
         input_dim=220,
         output_dim=1536,
-        dropout_p=0):
+        dropout_p=0, device='cpu'):
 
         super(InputLayer, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.dropout_p = dropout_p
 
-        self.lda = nn.Linear(self.input_dim, self.input_dim)
+        self.lda = nn.Linear(self.input_dim, self.input_dim, device=device)
         self.kernel = nn.Linear(self.input_dim,
-                                self.output_dim)
+                                self.output_dim, device=device)
 
         self.nonlinearity = nn.ReLU()
-        self.bn = nn.BatchNorm1d(output_dim, affine=False, eps=0.001)
+        self.bn = nn.BatchNorm1d(output_dim, affine=False, eps=0.001, device=device)
         self.drop = nn.Dropout(p=self.dropout_p)
 
     def forward(self, x):

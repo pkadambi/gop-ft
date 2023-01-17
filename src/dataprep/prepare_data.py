@@ -57,10 +57,12 @@ def create_epadb_full_sample_list(data_root_path, utterance_list_path):
         utt_list_fh.write(basename.split('.')[0] + ' ' + file + '\n')
 
 def copy_sample_lists_and_reference(train_list_path, test_list_path, reference_path, dataprep_output_path):
-    new_train_list_path = dataprep_output_path + "epadb_full_path_list.txt"
-    new_test_list_path = dataprep_output_path  + "heldout_full_path_list.txt"
-    new_reference_path = dataprep_output_path  + "reference_transcriptions.txt"
-
+    # new_train_list_path = dataprep_output_path + "epadb_full_path_list.txt"
+    # new_test_list_path = dataprep_output_path  + "heldout_full_path_list.txt"
+    # new_reference_path = dataprep_output_path  + "reference_transcriptions.txt"
+    new_train_list_path = os.path.join(dataprep_output_path,  "child_full_path_list.txt")
+    new_test_list_path = os.path.join(dataprep_output_path,  "heldout_full_path_list.txt")
+    new_reference_path = os.path.join(dataprep_output_path, "reference_transcriptions.txt")
     if not os.path.exists(new_train_list_path):
         os.system('cp ' + train_list_path + ' ' + new_train_list_path)
 

@@ -4,6 +4,7 @@ from kaldi.util.table import RandomAccessMatrixReader
 import numpy as np
 import torch
 from IPython import embed
+import re
 
 
 class FeatureManager:
@@ -30,12 +31,16 @@ class FeatureManager:
 
         # Iterate over waveforms and write their names in wav.scp and spk2utt
         # Also, create text file with transcriptions of all phrases
-        epadb_glob = glob.glob(self.epadb_root_path + '/*/waveforms/*')
-        heldout_glob = []
-        if self.heldout_root_path != '':
-            heldout_glob = glob.glob(self.heldout_root_path + '/*/waveforms/*')
+        f = open('./child_full_path_list.txt', 'r')
+        filepaths = f.readlines()
+        f.close()
+        filepaths = [pth.split(' ')[1].replace('\n', '') for pth in filepaths]
 
-        for file in epadb_glob + heldout_glob:
+        # heldout_glob = []
+        # if self.heldout_root_path != '':
+        #     heldout_glob = glob.glob(self.heldout_root_path + '/*/waveforms/*')
+
+        for file in filepaths:
             fullpath = os.path.abspath(file)
             logid = os.path.splitext(os.path.basename(file))[0]
             wav_scp_file.write(logid + ' ' + fullpath + '\n')
@@ -99,12 +104,16 @@ class FeatureManager:
         return ivector_period
 
     def get_transcription_for_logid(self, logid):
-        spkr = logid.split('_')[0]
-        transcription_path = self.epadb_root_path + '/' + spkr + '/transcriptions/' + logid + '.lab'
+        i = re.search('[a-z]', logid).start()
+        spkr = logid[:i]
+        if spkr[-1]=='_': # to deal with 0609_F_AK
+            spkr = spkr[:-1]
+        transcription_path = os.path.join(self.epadb_root_path , spkr , logid + '.lab')
 
         if not os.path.isfile(transcription_path):
             raise Exception("Transcription file for logid " + logid + " not found in path " + transcription_path + ".")
 
         with open(transcription_path, 'r') as transcription_fh:
             transcription = transcription_fh.readlines()[0]
+        transcription = transcription.replace('\n', '')
         return transcription

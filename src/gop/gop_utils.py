@@ -11,7 +11,7 @@ from IPython import embed
 #Generates transitions file
 def show_transitions(dir_show_transitions, show_transitions_output_filename, libri_phones_path, libri_final_mdl_path):
     
-    path_show_transitions = dir_show_transitions + "/" + show_transitions_output_filename
+    path_show_transitions = os.path.join(dir_show_transitions, show_transitions_output_filename)
 
     if not os.path.isdir(dir_show_transitions):
         os.mkdir(dir_show_transitions)
@@ -89,14 +89,14 @@ def generate_df_phones_pure(libri_phones_path, libri_phones_to_pure_int_path, li
 
     df_phone_pure = pd.DataFrame(output)
 
-    dir_show_transitions = gop_dir + "/transitions/"
+    dir_show_transitions = os.path.join(gop_dir, "transitions/")
     show_transitions_output_filename = "show-transitions.txt"
     
     path_show_transitions = dir_show_transitions + show_transitions_output_filename
 
     show_transitions(dir_show_transitions, show_transitions_output_filename, libri_phones_path, libri_final_mdl_path)
 
-    path_output_transitions = gop_dir + "/transitions.pickle"
+    path_output_transitions = os.path.join(gop_dir, "transitions.pickle")
 
 
     df_transitions = get_transitions(path_show_transitions, path_output_transitions)

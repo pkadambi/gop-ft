@@ -1,21 +1,22 @@
 import yaml
 from src.utils.run_utils import get_experiment_directory, get_run_name, add_data_keys_to_config_dict, get_phone_count
+import os
 
-def add_gop_and_exp_common_keys(config_dict, config_yaml, use_heldout):
-        config_dict["experiment-dir-path"] 	 = get_experiment_directory(config_yaml, use_heldout=use_heldout)
-        config_dict["run-name"] 			 = get_run_name(config_yaml, use_heldout=use_heldout)
-        config_dict["gop-scores-dir"] 		 = config_dict["experiment-dir-path"] 	  + "gop_scores/"	
-        config_dict["eval-dir"] 			 = config_dict["experiment-dir-path"] 	  + "eval/"
+def add_gop_and_exp_common_keys(config_dict, config_yaml, use_heldout, speakerid):
+        config_dict["experiment-dir-path"] 	 = get_experiment_directory(config_yaml, speakerid=speakerid, use_heldout=use_heldout)
+        config_dict["run-name"] 			 = get_run_name(config_yaml, speakerid, use_heldout=use_heldout)
+        config_dict["gop-scores-dir"] 		 = os.path.join(config_dict["experiment-dir-path"], "gop_scores/")
+        config_dict["eval-dir"] 			 = os.path.join(config_dict["experiment-dir-path"], "eval/")
         config_dict["held-out"]              = use_heldout
         config_dict["seed"]                  = 42
         return config_dict
 
 class DataprepConfig():
-    def __init__(self, config_yaml):
+    def __init__(self, config_yaml, speakerid):
         config_fh   = open(config_yaml, "r")
         config_dict = yaml.safe_load(config_fh)
 
-        config_dict = add_data_keys_to_config_dict(config_dict, "dataprep")
+        config_dict = add_data_keys_to_config_dict(config_dict, "dataprep", speakerid)
 
         self.config_dict = config_dict
     
@@ -44,19 +45,39 @@ class ExperimentConfig():
         self.config_dict = config_dict
 
 class GopConfig():
-    def __init__(self, config_yaml, use_heldout):
+    def __init__(self, config_yaml, use_heldout, speakerid):
         config_fh   = open(config_yaml, "r")
         config_dict = yaml.safe_load(config_fh)
 
-        config_dict = add_data_keys_to_config_dict(config_dict, "gop")
+        config_dict = add_data_keys_to_config_dict(config_dict, "gop", speakerid)
 
-        config_dict = add_gop_and_exp_common_keys(config_dict, config_yaml, use_heldout)
+        config_dict = add_gop_and_exp_common_keys(config_dict, config_yaml, use_heldout, speakerid)
 
         config_dict["eval-filename"]       = "data_for_eval.pickle"
-        config_dict["full-gop-score-path"] = config_dict["gop-scores-dir"] + "gop.txt"
+        config_dict["full-gop-score-path"] = os.path.join(config_dict["gop-scores-dir"], "gop.txt")
+        config_dict["holdout-speaker"] = speakerid
 
         if use_heldout:
             config_dict["utterance-list-path"] = config_dict["test-list-path"]
         else:
             config_dict["utterance-list-path"] = config_dict["train-list-path"]
+        self.config_dict = config_dict
+
+class FullConfig():
+    def __init__(self, config_yaml, speakerid, use_heldout):
+        config_fh   = open(config_yaml, "r")
+        config_dict = yaml.safe_load(config_fh)
+
+        config_dict = add_data_keys_to_config_dict(config_dict, "dataprep", speakerid)
+
+        config_dict = add_gop_and_exp_common_keys(config_dict, config_yaml, use_heldout, speakerid)
+
+        config_dict["eval-filename"] = "data_for_eval.pickle"
+        config_dict["full-gop-score-path"] = os.path.join(config_dict["gop-scores-dir"], "gop.txt")
+        config_dict["holdout-speaker"] = speakerid
+
+        # if use_heldout:
+        #     config_dict["utterance-list-path"] = config_dict["test-list-path"]
+        # else:
+        #     config_dict["utterance-list-path"] = config_dict["train-list-path"]
         self.config_dict = config_dict

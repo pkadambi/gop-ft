@@ -6,7 +6,7 @@ from src.pytorch_models.FTDNN import FTDNN
 
 class OutputLayer(nn.Module):
 
-    def __init__(self, linear1_in_dim, linear2_in_dim, linear3_in_dim, out_dim):
+    def __init__(self, linear1_in_dim, linear2_in_dim, linear3_in_dim, out_dim, device='cpu'):
 
         super(OutputLayer, self).__init__()
         self.linear1_in_dim = linear1_in_dim
@@ -14,12 +14,12 @@ class OutputLayer(nn.Module):
         self.linear3_in_dim = linear3_in_dim
         self.out_dim = out_dim
 
-        self.linear1 = nn.Linear(self.linear1_in_dim, self.linear2_in_dim, bias=True) 
+        self.linear1 = nn.Linear(self.linear1_in_dim, self.linear2_in_dim, bias=True, device=device)
         self.nl = nn.ReLU()
-        self.bn1 = nn.BatchNorm1d(self.linear2_in_dim, affine=False)
-        self.linear2 = nn.Linear(self.linear2_in_dim, self.linear3_in_dim, bias=False) 
-        self.bn2 = nn.BatchNorm1d(self.linear3_in_dim, affine=False)
-        self.linear3 = nn.Linear(self.linear1_in_dim, self.out_dim, bias=True)
+        self.bn1 = nn.BatchNorm1d(self.linear2_in_dim, affine=False, device=device)
+        self.linear2 = nn.Linear(self.linear2_in_dim, self.linear3_in_dim, bias=False, device=device)
+        self.bn2 = nn.BatchNorm1d(self.linear3_in_dim, affine=False, device=device)
+        self.linear3 = nn.Linear(self.linear1_in_dim, self.out_dim, bias=True, device=device)
         #self.softmax = nn.LogSoftmax()
 
     def forward(self, x):
@@ -35,9 +35,9 @@ class OutputLayer(nn.Module):
 
 class FTDNNAcoustic(nn.Module):
 
-    def __init__(self):
+    def __init__(self, device='cpu'):
         super(FTDNNAcoustic, self).__init__()
-        self.ftdnn        = FTDNN()
+        self.ftdnn        = FTDNN(device_name=device)
         self.output_layer = OutputLayer(256, 1536, 256, 6024)
 
     def forward(self, x):

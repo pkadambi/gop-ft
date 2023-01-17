@@ -95,6 +95,23 @@ def validate_gop_samples_with_utterance_list(gop_dict, utterance_list_path):
         embed()
         raise Exception("ERROR: Keys in gop dictionary do not match utterance list.")
 
+def delete_loglikes(config_dict):
+    loglike_path = os.path.join(config_dict['data-dir'], 'alignments')
+    loglike_heldout_file = os.path.join(loglike_path, 'loglikes.ark')
+    loglike_file = os.path.join(loglike_path, 'loglikes_heldout.ark')
+
+    if os.path.exists(loglike_file):
+        os.system(f'rm {loglike_file}')
+
+    if os.path.exists(loglike_heldout_file):
+        os.system(f'rm {loglike_heldout_file}')
+
+def save_speaker_gop_dict(config_dict):
+    gop_dict = pd.read_pickle(os.path.join(config_dict['gop-scores-dir'], 'gop.pickle'))
+    phoneiddf = pd.read_csv('./phones/kaldi/phones-list.txt', delimiter='\t', header=None, names=['phones', 'id_raw'])
+    phoneiddf['phoneid'] = phoneiddf['id_raw'].str.strip().str[:-1].str.strip()
+    phoneiddf = phoneiddf.set_index('phones')
+    print()
 
 def main(config_dict):
 
@@ -107,9 +124,14 @@ def main(config_dict):
     loglikes_path                 = config_dict["loglikes-path"]
     alignments_path               = config_dict["alignments-path"]
 
-    df_phones_pure, df_alignments = prepare_dataframes(libri_phones_path, libri_phones_to_pure_int_path, libri_phones_pure_path,
-                                                       libri_chain_mdl_path, gop_dir, alignments_path)
+    df_phones_pure, df_alignments = prepare_dataframes(libri_phones_path, libri_phones_to_pure_int_path,
+                                                       libri_phones_pure_path, libri_chain_mdl_path,
+                                                       gop_dir, alignments_path)
 
     compute_gop(gop_dir, df_phones_pure, df_alignments, loglikes_path, utterance_list_path, 1)
-
     save_gop_as_text(gop_dir)
+
+    delete_loglikes(config_dict)
+    save_speaker_gop_dict(config_dict)
+
+

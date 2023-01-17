@@ -25,14 +25,19 @@ def get_phone_count(phones_list_path):
 		phone_count += use_current_phone
 	return phone_count
 
-def get_run_name(config_yaml, use_heldout=False):
+def get_run_name(config_yaml, speakerid, use_heldout=False):
 	heldout_suffix = ''
 	if use_heldout:
 		heldout_suffix = '_heldout'
-	return os.path.basename(config_yaml).split('.')[0] + heldout_suffix
+	pathname = os.path.basename(config_yaml).split('.')[0] + heldout_suffix
+	# return os.path.join(pathname)
+	return pathname
 
-def get_experiment_directory(config_yaml, use_heldout=False):
-	return "experiments/" + get_run_name(config_yaml, use_heldout) + '/'
+def get_experiment_directory(config_yaml, speakerid, use_heldout=False):
+	speaker_exp_dir = os.path.join('./experiments', speakerid)
+	if not os.path.exists(speaker_exp_dir):
+		os.makedirs(speaker_exp_dir, exist_ok=True)
+	return os.path.join(speaker_exp_dir, get_run_name(config_yaml, speakerid, use_heldout))
 
 def swa_identifier(is_swa):
 	if is_swa:
@@ -66,7 +71,7 @@ def get_model_name(config_dict, fold, epoch=None, use_heldout=False, swa=False):
 	return run_name +  fold_id + '-epoch-' + str(epoch) + swa_id #Aca hay codigo repetido entre el PATH de train y esto
 
 def get_test_sample_list_path_for_fold(test_sample_list_dir, fold):
-	return test_sample_list_dir + "/test_sample_list_fold_" + str(fold) #Aca tmb codigo repetido
+	return os.path.join(test_sample_list_dir, "test_sample_list_fold_" + str(fold)) #Aca tmb codigo repetido
 
 def get_eval_stage(config_dict, epoch, is_swa=False):
     if config_dict.get("held-out"):
@@ -74,29 +79,31 @@ def get_eval_stage(config_dict, epoch, is_swa=False):
     else:
         return EvaluateScoresCrossValStage(config_dict, epoch=epoch, is_swa=is_swa)
 
-def add_data_keys_to_config_dict(config_dict, setup):
+def add_data_keys_to_config_dict(config_dict, setup, speakerid):
 
 	if setup == "dataprep":
 		data_dir_key = "output-dir"
 		config_dict["ref-labels-dir-path"]   = config_dict["data-root-path"]
 	else:
 		data_dir_key = "data-dir"
-
+	config_dict[data_dir_key] = os.path.join(config_dict[data_dir_key], speakerid)
 	data_path = config_dict[data_dir_key]
-	config_dict["alignments-dir-path"]   = data_path + "alignments/"
-	config_dict["alignments-path"]       = config_dict["alignments-dir-path"] + "align_output"
-	config_dict["heldout-align-path"]    = config_dict["alignments-dir-path"] + "align_output_heldout"
-	config_dict["loglikes-path"]         = config_dict["alignments-dir-path"] + "loglikes.ark"
-	config_dict["loglikes-heldout-path"] = config_dict["alignments-dir-path"] + "loglikes_heldout.ark"
-	config_dict["acoustic-model-path"]   = data_path + "pytorch_models/acoustic_model.pt"
-	config_dict["features-path"]         = data_path + "features/data"
-	config_dict["features-conf-path"]    = data_path + "features/conf"
-	config_dict["auto-labels-dir-path"]  = data_path + "kaldi_labels/"
-	config_dict["utterance-list-path"]   = data_path + "/epadb_full_path_list.txt"
-	config_dict["train-list-path"]       = data_path + "/epadb_full_path_list.txt"
-	config_dict["test-list-path"]        = data_path + "/heldout_full_path_list.txt"
-	config_dict["reference-trans-path"]  = data_path + "/reference_transcriptions.txt"
-        
+
+	config_dict["alignments-dir-path"]   = os.path.join(data_path, "alignments")
+	config_dict["alignments-path"]       = os.path.join(config_dict["alignments-dir-path"], "align_output")
+	config_dict["heldout-align-path"]    = os.path.join(config_dict["alignments-dir-path"], "align_output_heldout")
+	config_dict["loglikes-path"]         = os.path.join(config_dict["alignments-dir-path"], "loglikes.ark")
+	config_dict["loglikes-heldout-path"] = os.path.join(config_dict["alignments-dir-path"], "loglikes_heldout.ark")
+	config_dict["acoustic-model-path"]   = os.path.join(config_dict['pytorch-models-path'], 'acoustic_model.pt')
+	config_dict["acoustic-model-path"]   = os.path.join(data_path, 'pytorch_models/acoustic_model.pt')
+	config_dict["features-path"]         = os.path.join(data_path , "features/data")
+	config_dict["features-conf-path"]    = "./data/features/conf"
+	config_dict["auto-labels-dir-path"]  = os.path.join(data_path , "kaldi_labels/")
+	config_dict["utterance-list-path"]   = os.path.join('./configs/speakers', speakerid, "train_full_path_list.txt")
+	config_dict["train-list-path"]       = os.path.join('./configs/speakers', speakerid, "train_full_path_list.txt")
+	config_dict["test-list-path"]        = os.path.join('./configs/speakers', speakerid, "heldout_full_path_list.txt")
+	config_dict["reference-trans-path"]  = "./child_speech_16_khz_test/reference_transcriptions.txt"
+	config_dict['speaker-id'] = speakerid
 
 	return config_dict
 
